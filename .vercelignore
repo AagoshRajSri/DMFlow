@@ -1,0 +1,5 @@
+# Prevent backend and server files from being uploaded to Vercel
+server.js
+backend/
+backend/**
+*.log

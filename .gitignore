@@ -1,0 +1,21 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Tests / coverage
+coverage/
+
+# Build
+dist/
+build/
+
+# Logs
+*.log
+
+# IDEs
+.vscode/
+.DS_Store

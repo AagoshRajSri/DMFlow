@@ -36,7 +36,16 @@ async function processOne(client) {
     { $set: { status: "processing", updatedAt: new Date() } },
     { sort: { nextAttemptAt: 1 }, new: true },
   );
-  if (!job) return false;
+  if (!job) {
+    return false;
+  }
+
+  console.log(
+    "WORKER PICKED JOB:",
+    job._id.toString(),
+    job.recipientUserId,
+    job.status,
+  );
   const j = job;
 
   try {
@@ -53,6 +62,7 @@ async function processOne(client) {
     };
 
     const resp = await client.sendDM(payload, idempotencyKey);
+    console.log("DM RESPONSE:", resp.status, resp.data);
     if (resp.status === 202 || resp.status === 200 || resp.status === 201) {
       const data = resp.data || {};
       j.dmId = data.dm_id || data.id || null;

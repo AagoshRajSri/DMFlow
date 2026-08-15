@@ -1,0 +1,4 @@
+- Concurrency race on Duplicate check: simultaneous workers may both find no existing DM and both enqueue sends, causing double-DM unless DB-level unique constraints are enforced. This implementation relies on a find-then-insert pattern and can still race under high concurrency.
+- In-memory queue loss on process restart: webhooks acknowledged quickly (<=50ms) but queued in-memory; if the process crashes before persisting enough state the job can be lost leading to missed DMs.
+- Rate-limit storms and backlog: sudden spikes of DM triggers can exhaust the 10req/60s bucket and cause large backlogs and delayed deliveries; long Retry-After values will further delay retries and increase queued state counts.
+- Remote API contract drift: if the pseudogram API changes response shapes or status names for DM status polling, the poller may mis-classify terminal states (e.g., new intermediate states), causing incorrect sent/failed counts.

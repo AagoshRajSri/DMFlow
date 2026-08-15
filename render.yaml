@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: linkplease-backend
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    envVars:
+      - key: MONGODB_URI
+      - key: PSEUDOGRAM_API_KEY
+      - key: PSEUDOGRAM_BASE_URL
+      - key: WEBHOOK_VERIFY_SIGNATURE

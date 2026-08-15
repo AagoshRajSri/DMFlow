@@ -11,11 +11,15 @@ function jitter(min, max) {
 }
 
 function createLimiter() {
+  const reservoir = Number(process.env.PSEUDOGRAM_RATE_LIMIT || 8);
+  const reservoirRefreshInterval = Number(
+    process.env.PSEUDOGRAM_RATE_INTERVAL_MS || 60000,
+  );
   return new Bottleneck({
-    reservoir: 10,
-    reservoirRefreshAmount: 10,
-    reservoirRefreshInterval: 60 * 1000,
-    maxConcurrent: 5,
+    reservoir,
+    reservoirRefreshAmount: reservoir,
+    reservoirRefreshInterval,
+    maxConcurrent: 1,
   });
 }
 
@@ -48,48 +52,57 @@ async function processOne(client) {
   );
   const j = job;
 
+  // We do not increment attempts before calling the API to avoid counting 429s
+  const maxRetries = Number(process.env.MAX_DM_RETRIES || 5);
+  const idempotencyKey = `${j.ruleId.toString()}:${j.recipientUserId}`;
+  const payload = {
+    recipient_user_id: j.recipientUserId,
+    message: j.message,
+    comment_id: j.commentId,
+  };
+
   try {
-    j.attempts += 1;
-    await j.save();
-    const maxRetries = Number(process.env.MAX_DM_RETRIES || 5);
-
-    // deterministic idempotency key
-    const idempotencyKey = `${j.ruleId.toString()}:${j.recipientUserId}`;
-    const payload = {
-      recipient_user_id: j.recipientUserId,
-      message: j.message,
-      comment_id: j.commentId,
-    };
-
+    console.log("DM REQUEST", { jobId: j._id.toString(), recipient: j.recipientUserId });
     const resp = await client.sendDM(payload, idempotencyKey);
-    console.log("DM RESPONSE:", resp.status, resp.data);
+    console.log("DM RESPONSE", { jobId: j._id.toString(), status: resp.status });
+
+    // Handle rate limited explicitly: do NOT increment attempts
+    if (resp.status === 429) {
+      const ra = resp.headers["retry-after"];
+      const wait = ra ? Number(ra) * 1000 : Number(process.env.PSEUDOGRAM_RATE_INTERVAL_MS || 60000);
+      j.status = "queued";
+      j.nextAttemptAt = new Date(Date.now() + wait);
+      await j.save();
+      console.log("JOB RATE LIMITED", j._id.toString(), "retryAt=", j.nextAttemptAt.toISOString());
+      return true;
+    }
+
+    // For non-429 responses, increment attempts because an attempt was consumed
+    j.attempts = (j.attempts || 0) + 1;
+
     if (resp.status === 202 || resp.status === 200 || resp.status === 201) {
       const data = resp.data || {};
       j.dmId = data.dm_id || data.id || null;
       j.status = "accepted";
       await j.save();
-      // ensure Delivery exists (upsert) without creating duplicates
-      try {
-        await Delivery.create({
-          ruleId: j.ruleId,
-          recipientUserId: j.recipientUserId,
-        });
-      } catch (err) {
-        // duplicate -> increment duplicate counter stored as a blocked DMJob
-        if (err.code === 11000) {
-          // create a blocked job record by setting status failed with reason
-          // we keep duplicate handling in webhook flow ideally; here just continue
-        }
-      }
-      return true;
-    }
 
-    if (resp.status === 429) {
-      const ra = resp.headers["retry-after"];
-      const wait = ra ? Number(ra) * 1000 : 10000;
-      j.status = "queued";
-      j.nextAttemptAt = new Date(Date.now() + wait);
-      await j.save();
+      // Atomic upsert for Delivery: create if not exists
+      try {
+        const upsertRes = await Delivery.updateOne(
+          { ruleId: j.ruleId, recipientUserId: j.recipientUserId },
+          { $setOnInsert: { ruleId: j.ruleId, recipientUserId: j.recipientUserId, status: "queued", createdAt: new Date() } },
+          { upsert: true },
+        );
+        // If already existed, record duplicate_blocked state for visibility
+        if (upsertRes && upsertRes.upsertedCount === 0) {
+          // delivery existed
+          console.log("DUPLICATE BLOCKED (delivery exists)", j.ruleId.toString(), j.recipientUserId);
+        }
+      } catch (err) {
+        console.error("delivery upsert error", err && err.message ? err.message : err);
+      }
+
+      console.log("JOB ACCEPTED", j._id.toString(), j.recipientUserId);
       return true;
     }
 
@@ -100,9 +113,11 @@ async function processOne(client) {
       if (j.attempts >= maxRetries) {
         j.status = "failed";
         j.lastError = `status_${resp.status}`;
+        console.log("JOB FAILED", j._id.toString(), `status_${resp.status}`);
       } else {
         j.status = "queued";
         j.nextAttemptAt = new Date(Date.now() + next);
+        console.log("JOB RETRY", j._id.toString(), "nextAttemptAt=", j.nextAttemptAt.toISOString());
       }
       await j.save();
       return true;
@@ -112,16 +127,21 @@ async function processOne(client) {
     j.status = "failed";
     j.lastError = `status_${resp.status}`;
     await j.save();
+    console.log("JOB FAILED", j._id.toString(), `status_${resp.status}`);
     return true;
   } catch (err) {
     // network or unexpected
+    console.error("DM SEND ERROR", { jobId: j._id.toString(), err: err && err.message ? err.message : String(err) });
+    j.attempts = (j.attempts || 0) + 1;
     const backoff = Math.min(30000, 500 * Math.pow(2, j.attempts));
     if (j.attempts >= maxRetries) {
       j.status = "failed";
       j.lastError = err.message;
+      console.log("JOB FAILED", j._id.toString(), err && err.message ? err.message : err);
     } else {
       j.status = "queued";
       j.nextAttemptAt = new Date(Date.now() + backoff);
+      console.log("JOB RETRY", j._id.toString(), "nextAttemptAt=", j.nextAttemptAt.toISOString());
     }
     await j.save();
     return true;

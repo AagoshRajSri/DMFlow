@@ -113,15 +113,10 @@ async function start() {
     console.log(`WORKER_LOOP[${id}] stopped`);
   }
 
-  // start worker loop
-  const workerConcurrency = Number(process.env.WORKER_CONCURRENCY || 5);
-  const workerTasks = [];
-  for (let i = 0; i < workerConcurrency; i++) {
-    const t = workerLoop(i).catch((err) =>
-      console.error("workerLoop fatal", sanitizeError(err)),
-    );
-    workerTasks.push(t);
-  }
+  // start exactly one worker loop (self-scheduling)
+  const workerTask = workerLoop(0).catch((err) =>
+    console.error("workerLoop fatal", sanitizeError(err)),
+  );
 
   const reconInterval = setInterval(async () => {
     try {
@@ -148,7 +143,7 @@ async function start() {
       // wait for worker loops to finish their current iteration
       try {
         await Promise.race([
-          Promise.allSettled(workerTasks),
+          workerTask,
           new Promise((res) => setTimeout(res, Math.max(pollMs * 2, 1000))),
         ]);
       } catch (e) {

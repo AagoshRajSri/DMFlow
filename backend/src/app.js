@@ -230,5 +230,36 @@ app.get("/stats", async (_req, res) => {
   }
 });
 
+// Diagnostic endpoint — do not expose message contents or secrets
+app.get("/debug/jobs", async (_req, res) => {
+  try {
+    const queued = await DMJob.countDocuments({ status: "queued" });
+    const processing = await DMJob.countDocuments({ status: "processing" });
+    const accepted = await DMJob.countDocuments({ status: "accepted" });
+    const delivered = await DMJob.countDocuments({ status: "delivered" });
+    const failed = await DMJob.countDocuments({ status: "failed" });
+
+    const oldestQueued = await DMJob.findOne({ status: "queued" })
+      .sort({ nextAttemptAt: 1 })
+      .lean();
+    const oldestAccepted = await DMJob.findOne({ status: "accepted" })
+      .sort({ updatedAt: 1 })
+      .lean();
+
+    res.json({
+      queued,
+      processing,
+      accepted,
+      delivered,
+      failed,
+      oldestQueued: oldestQueued ? { jobId: oldestQueued._id.toString(), nextAttemptAt: oldestQueued.nextAttemptAt } : null,
+      oldestAccepted: oldestAccepted ? { jobId: oldestAccepted._id.toString(), updatedAt: oldestAccepted.updatedAt } : null,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal_error" });
+  }
+});
+
 module.exports = app;
 ``;

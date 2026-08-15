@@ -9,6 +9,7 @@ class PseudoGramClient {
 
   async sendDM(payload, idempotencyKey) {
     const fn = async () => {
+      // execute the HTTP request; validateStatus allows handling in caller
       const resp = await this.axios.post("/v1/dm/send", payload, {
         headers: {
           "X-API-Key": this.apiKey,
@@ -20,8 +21,21 @@ class PseudoGramClient {
       return resp;
     };
 
-    if (this.limiter) return this.limiter.schedule(fn);
-    return fn();
+    if (this.limiter) {
+      try {
+        console.log("DM REQUEST", { idempotencyKey, recipient: payload.recipient_user_id });
+        const resp = await this.limiter.schedule(fn);
+        console.log("DM RESPONSE", { status: resp.status });
+        return resp;
+      } catch (err) {
+        console.error("DM REQUEST ERROR", { idempotencyKey, recipient: payload.recipient_user_id, err: err && err.message ? err.message : String(err) });
+        throw err;
+      }
+    }
+    console.log("DM REQUEST (no limiter)", { idempotencyKey, recipient: payload.recipient_user_id });
+    const resp = await fn();
+    console.log("DM RESPONSE (no limiter)", { status: resp.status });
+    return resp;
   }
 
   async getDMStatus(dmId) {

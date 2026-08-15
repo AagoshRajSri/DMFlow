@@ -1,32 +1,38 @@
-import React, { useState } from 'react'
-import axios from 'axios'
+import React, { useState } from "react";
+import axios from "axios";
 
 export default function RuleForm({ base, onSuccess }) {
-  const [keyword, setKeyword] = useState('')
-  const [dm, setDm] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState(null)
+  const [keyword, setKeyword] = useState("");
+  const [dm, setDm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState(null);
 
   const submit = async (e) => {
-    e.preventDefault()
-    setMessage(null)
+    e.preventDefault();
+    setMessage(null);
     if (!keyword.trim() || !dm.trim()) {
-      setMessage({ type: 'error', text: 'Keyword and DM message are required.' })
-      return
+      setMessage({
+        type: "error",
+        text: "Keyword and DM message are required.",
+      });
+      return;
     }
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await axios.post(`${base}/rules`, { keyword: keyword.trim(), dm_message: dm.trim() })
-      setMessage({ type: 'success', text: 'Rule created.' })
-      setKeyword('')
-      setDm('')
-      if (onSuccess) onSuccess(res.data)
+      const res = await axios.post(`${base}/rules`, {
+        keyword: keyword.trim(),
+        dm_message: dm.trim(),
+      });
+      setMessage({ type: "success", text: "Rule created." });
+      setKeyword("");
+      setDm("");
+      if (onSuccess) onSuccess(res.data);
     } catch (err) {
-      setMessage({ type: 'error', text: 'Failed to create rule. Try again.' })
+      setMessage({ type: "error", text: "Failed to create rule. Try again." });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <form onSubmit={submit} className="space-y-3">
@@ -52,14 +58,16 @@ export default function RuleForm({ base, onSuccess }) {
           className="px-4 py-2 bg-emerald-500 text-black font-semibold rounded-md disabled:opacity-60"
           disabled={loading}
         >
-          {loading ? 'Creating…' : 'Create Rule'}
+          {loading ? "Creating…" : "Create Rule"}
         </button>
         {message && (
-          <div className={`${message.type === 'error' ? 'text-red-400' : 'text-emerald-300'} text-sm`}>
+          <div
+            className={`${message.type === "error" ? "text-red-400" : "text-emerald-300"} text-sm`}
+          >
             {message.text}
           </div>
         )}
       </div>
     </form>
-  )
+  );
 }

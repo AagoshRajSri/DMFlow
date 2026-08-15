@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react";
 
 export default function Header({ online, fetchHealth }) {
   return (
@@ -17,12 +17,14 @@ export default function Header({ online, fetchHealth }) {
         </button>
         <div className="flex items-center space-x-2">
           <span
-            className={`w-3 h-3 rounded-full ${online ? 'bg-emerald-400' : 'bg-red-500'}`}
+            className={`w-3 h-3 rounded-full ${online ? "bg-emerald-400" : "bg-red-500"}`}
             aria-hidden
           />
-          <span className="text-sm text-gray-300">{online ? 'Backend Online' : 'Backend Offline'}</span>
+          <span className="text-sm text-gray-300">
+            {online ? "Backend Online" : "Backend Offline"}
+          </span>
         </div>
       </div>
     </header>
-  )
+  );
 }

@@ -1,52 +1,57 @@
-import React, { useEffect, useState, useRef } from 'react'
-import axios from 'axios'
-import Header from './components/Header'
-import Stats from './components/Stats'
-import RuleForm from './components/RuleForm'
-import RulesList from './components/RulesList'
-import WebhookTest from './components/WebhookTest'
+import React, { useEffect, useState, useRef } from "react";
+import axios from "axios";
+import Header from "./components/Header";
+import Stats from "./components/Stats";
+import RuleForm from "./components/RuleForm";
+import RulesList from "./components/RulesList";
+import WebhookTest from "./components/WebhookTest";
 
-const BASE = 'https://dmflow-wgoy.onrender.com'
+const BASE = "https://dmflow-wgoy.onrender.com";
 
 export default function App() {
-  const [backendOnline, setBackendOnline] = useState(false)
-  const [stats, setStats] = useState({ sent: 0, failed: 0, queued: 0, duplicates_blocked: 0 })
-  const [loadingStats, setLoadingStats] = useState(true)
-  const [rules, setRules] = useState([])
-  const statsTimer = useRef(null)
+  const [backendOnline, setBackendOnline] = useState(false);
+  const [stats, setStats] = useState({
+    sent: 0,
+    failed: 0,
+    queued: 0,
+    duplicates_blocked: 0,
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [rules, setRules] = useState([]);
+  const statsTimer = useRef(null);
 
   const fetchHealth = async () => {
     try {
-      await axios.get(`${BASE}/health`, { timeout: 3000 })
-      setBackendOnline(true)
+      await axios.get(`${BASE}/health`, { timeout: 3000 });
+      setBackendOnline(true);
     } catch (e) {
-      setBackendOnline(false)
+      setBackendOnline(false);
     }
-  }
+  };
 
   const fetchStats = async () => {
-    setLoadingStats(true)
+    setLoadingStats(true);
     try {
-      const res = await axios.get(`${BASE}/stats`)
-      setStats(res.data)
+      const res = await axios.get(`${BASE}/stats`);
+      setStats(res.data);
     } catch (e) {
       // keep existing stats
     } finally {
-      setLoadingStats(false)
+      setLoadingStats(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchHealth()
-    fetchStats()
-    statsTimer.current = setInterval(fetchStats, 5000)
-    return () => clearInterval(statsTimer.current)
-  }, [])
+    fetchHealth();
+    fetchStats();
+    statsTimer.current = setInterval(fetchStats, 5000);
+    return () => clearInterval(statsTimer.current);
+  }, []);
 
   const handleAddRule = (rule) => {
     // store in frontend session state
-    setRules((r) => [rule, ...r])
-  }
+    setRules((r) => [rule, ...r]);
+  };
 
   return (
     <div className="min-h-screen p-6 max-w-5xl mx-auto">
@@ -57,7 +62,9 @@ export default function App() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="card">
-            <h3 className="text-lg font-semibold mb-3">Create Automation Rule</h3>
+            <h3 className="text-lg font-semibold mb-3">
+              Create Automation Rule
+            </h3>
             <RuleForm base={BASE} onSuccess={handleAddRule} />
           </div>
 
@@ -68,10 +75,12 @@ export default function App() {
         </div>
 
         <div className="card">
-          <h3 className="text-lg font-semibold mb-3">Your Rules (this session)</h3>
+          <h3 className="text-lg font-semibold mb-3">
+            Your Rules (this session)
+          </h3>
           <RulesList rules={rules} />
         </div>
       </div>
     </div>
-  )
+  );
 }

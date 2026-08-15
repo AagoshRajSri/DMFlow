@@ -83,19 +83,51 @@ async function start() {
   const pollMs = Number(process.env.WORKER_POLL_MS || 1000);
   const reconciliationMs = Number(process.env.RECONCILIATION_MS || 15000);
 
-  const workerInterval = setInterval(async () => {
-    try {
-      await processOne(client);
-    } catch (err) {
-      console.error("worker error", err);
+  let workerRunning = true;
+  let workerIdleLogged = false;
+
+  async function sleep(ms) {
+    return new Promise((res) => setTimeout(res, ms));
+  }
+
+  async function workerLoop(id) {
+    console.log(`WORKER_LOOP[${id}] started`);
+    while (workerRunning) {
+      try {
+        const processed = await processOne(client);
+        if (!processed) {
+          if (!workerIdleLogged) {
+            console.log("WORKER: queue empty, sleeping");
+            workerIdleLogged = true;
+          }
+          await sleep(pollMs);
+        } else {
+          // work done, continue immediately
+          workerIdleLogged = false;
+        }
+      } catch (err) {
+        console.error("worker error", sanitizeError(err));
+        await sleep(pollMs);
+      }
     }
-  }, pollMs);
+    console.log(`WORKER_LOOP[${id}] stopped`);
+  }
+
+  // start worker loop
+  const workerConcurrency = Number(process.env.WORKER_CONCURRENCY || 5);
+  const workerTasks = [];
+  for (let i = 0; i < workerConcurrency; i++) {
+    const t = workerLoop(i).catch((err) =>
+      console.error("workerLoop fatal", sanitizeError(err)),
+    );
+    workerTasks.push(t);
+  }
 
   const reconInterval = setInterval(async () => {
     try {
       await reconciliationLoop(client);
     } catch (err) {
-      console.error("recon error", err);
+      console.error("recon error", sanitizeError(err));
     }
   }, reconciliationMs);
 
@@ -104,12 +136,31 @@ async function start() {
   );
 
   const shutdown = async () => {
-    console.log("Shutting down");
-    clearInterval(workerInterval);
-    clearInterval(reconInterval);
-    server.close();
-    await mongoose.disconnect();
-    process.exit(0);
+    try {
+      console.log("Shutting down");
+      workerRunning = false;
+      // allow reconciliation to stop
+      clearInterval(reconInterval);
+      // close HTTP server gracefully
+      server.close(() => {
+        console.log("HTTP server closed");
+      });
+      // wait for worker loops to finish their current iteration
+      try {
+        await Promise.race([
+          Promise.allSettled(workerTasks),
+          new Promise((res) => setTimeout(res, Math.max(pollMs * 2, 1000))),
+        ]);
+      } catch (e) {
+        // ignore
+      }
+      await mongoose.disconnect();
+      console.log("MongoDB disconnected");
+      process.exit(0);
+    } catch (err) {
+      console.error("shutdown error", sanitizeError(err));
+      process.exit(1);
+    }
   };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);

@@ -15,7 +15,7 @@ function createLimiter() {
     reservoir: 10,
     reservoirRefreshAmount: 10,
     reservoirRefreshInterval: 60 * 1000,
-    maxConcurrent: 1,
+    maxConcurrent: 5,
   });
 }
 

@@ -30,8 +30,8 @@ export default function App() {
     }
   };
 
-  const fetchStats = async () => {
-    setLoadingStats(true);
+  const fetchStats = async (isBackgroundPoll = false) => {
+    if (!isBackgroundPoll) setLoadingStats(true);
     try {
       const res = await axios.get(`${BASE}/stats`);
       setStats(res.data);
@@ -39,14 +39,14 @@ export default function App() {
     } catch (e) {
       setBackendOnline(false);
     } finally {
-      setLoadingStats(false);
+      if (!isBackgroundPoll) setLoadingStats(false);
     }
   };
 
   useEffect(() => {
     fetchHealth();
-    fetchStats();
-    statsTimer.current = setInterval(fetchStats, 5000);
+    fetchStats(false); // initial load shows loading state
+    statsTimer.current = setInterval(() => fetchStats(true), 5000); // background polls do not show loading
     return () => clearInterval(statsTimer.current);
   }, []);
 

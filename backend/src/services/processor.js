@@ -51,10 +51,21 @@ async function createDeliveryAndJobAtomic({
           err.code === 20 ||
           err.codeName === "IllegalOperation"));
     if (txNotSupported) {
-      // fallback: try idempotent path without transaction
+      // fallback: create Delivery first to rely on Delivery's unique index,
+      // then create the DMJob only when Delivery creation succeeds.
       try {
-        // first, try to create DMJob
-        const job = await DMJob.create({
+        try {
+          await Delivery.create({ ruleId, recipientUserId });
+        } catch (de) {
+          if (de && de.code === 11000) {
+            // Delivery already exists -> treat as duplicate, do not create any DMJob
+            return { created: false, duplicate: true };
+          }
+          throw de;
+        }
+
+        // Delivery created successfully, now create the DMJob
+        await DMJob.create({
           ruleId,
           eventId,
           commentId,
@@ -64,23 +75,9 @@ async function createDeliveryAndJobAtomic({
           attempts: 0,
           nextAttemptAt: new Date(),
         });
-        try {
-          await Delivery.create({ ruleId, recipientUserId });
-        } catch (de) {
-          if (de.code === 11000) {
-            // duplicate delivery existed; mark job as duplicate_blocked and remove job
-            await DMJob.updateOne(
-              { _id: job._id },
-              { $set: { status: "failed", lastError: "duplicate_blocked" } },
-            );
-            return { created: false, duplicate: true };
-          }
-          throw de;
-        }
         return { created: true };
       } catch (e2) {
-        if (e2.code === 11000) {
-          // duplicate Delivery (someone else created it concurrently)
+        if (e2 && e2.code === 11000) {
           return { created: false, duplicate: true };
         }
         throw e2;
@@ -167,19 +164,6 @@ async function processWebhookEventById(eventId) {
 
       if (res.created) {
         // enqueue is done, mark event processed
-      } else if (res.duplicate) {
-        // duplicate blocked
-        // create a DMJob record marking duplicate_blocked for visibility
-        await DMJob.create({
-          ruleId: rule._id,
-          eventId,
-          commentId,
-          recipientUserId,
-          message: rule.dmMessage,
-          status: "failed",
-          attempts: 0,
-          lastError: "duplicate_blocked",
-        }).catch(() => {});
       }
     }
   }

@@ -245,6 +245,9 @@ app.get("/debug/jobs", async (_req, res) => {
     const oldestAccepted = await DMJob.findOne({ status: "accepted" })
       .sort({ updatedAt: 1 })
       .lean();
+    const oldestProcessing = await DMJob.findOne({ status: "processing" })
+      .sort({ processingStartedAt: 1 })
+      .lean();
 
     res.json({
       queued,
@@ -254,6 +257,7 @@ app.get("/debug/jobs", async (_req, res) => {
       failed,
       oldestQueued: oldestQueued ? { jobId: oldestQueued._id.toString(), nextAttemptAt: oldestQueued.nextAttemptAt } : null,
       oldestAccepted: oldestAccepted ? { jobId: oldestAccepted._id.toString(), updatedAt: oldestAccepted.updatedAt } : null,
+      oldestProcessing: oldestProcessing ? { jobId: oldestProcessing._id.toString(), processingStartedAt: oldestProcessing.processingStartedAt } : null,
     });
   } catch (err) {
     console.error(err);

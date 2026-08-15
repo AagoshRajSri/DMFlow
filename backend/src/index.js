@@ -41,7 +41,7 @@ const cors = require("cors");
 const crypto = require("crypto");
 const app = require("./app");
 const DMJob = require("./models/DMJob");
-const { processOne, reconciliationLoop, buildClient } = require("./worker");
+const { processOne, reconciliationLoop, buildClient, recoverStaleProcessing } = require("./worker");
 
 const PORT = process.env.PORT || 3000;
 
@@ -68,11 +68,12 @@ async function start() {
   await mongoose.connect(mongoUri);
   console.log("MongoDB connected");
 
-  // recover processing jobs
-  await DMJob.updateMany(
-    { status: "processing" },
-    { $set: { status: "queued" } },
-  );
+  // recover only stale processing jobs (use processingStartedAt lease)
+  try {
+    await recoverStaleProcessing();
+  } catch (e) {
+    console.error("startup recovery error", sanitizeError(e));
+  }
 
   // process any persisted WebhookEvent that hasn't been processed yet
   const { processPendingWebhookEvents } = require("./services/processor");
@@ -82,6 +83,7 @@ async function start() {
 
   const pollMs = Number(process.env.WORKER_POLL_MS || 1000);
   const reconciliationMs = Number(process.env.RECONCILIATION_MS || 15000);
+  const recoveryMs = Number(process.env.PROCESSING_RECOVERY_MS || 60000);
 
   let workerRunning = true;
   let workerIdleLogged = false;
@@ -126,6 +128,15 @@ async function start() {
     }
   }, reconciliationMs);
 
+  // periodic recovery of stale 'processing' leases
+  const recoverInterval = setInterval(async () => {
+    try {
+      await recoverStaleProcessing();
+    } catch (err) {
+      console.error("recover error", sanitizeError(err));
+    }
+  }, recoveryMs);
+
   const server = app.listen(PORT, () =>
     console.log(`Backend listening ${PORT}`),
   );
@@ -136,6 +147,7 @@ async function start() {
       workerRunning = false;
       // allow reconciliation to stop
       clearInterval(reconInterval);
+      clearInterval(recoverInterval);
       // close HTTP server gracefully
       server.close(() => {
         console.log("HTTP server closed");

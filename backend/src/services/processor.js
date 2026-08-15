@@ -136,7 +136,14 @@ async function processWebhookEventById(eventId) {
   for (const rule of rules) {
     if (!rule.keyword) continue;
     if (text.toLowerCase().includes(rule.keyword.toLowerCase())) {
-      // try atomic create
+      console.log("MATCHED RULE:", {
+        ruleId: rule._id.toString(),
+        keyword: rule.keyword,
+        text,
+        recipientUserId,
+        eventId,
+      });
+
       const res = await createDeliveryAndJobAtomic({
         ruleId: rule._id,
         recipientUserId,
@@ -144,6 +151,9 @@ async function processWebhookEventById(eventId) {
         commentId,
         message: rule.dmMessage,
       });
+
+      console.log("JOB RESULT:", res);
+
       if (res.created) {
         // enqueue is done, mark event processed
       } else if (res.duplicate) {

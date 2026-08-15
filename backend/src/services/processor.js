@@ -11,6 +11,7 @@ async function createDeliveryAndJobAtomic({
   commentId,
   message,
 }) {
+  const idempotencyKey = `${ruleId.toString()}:${recipientUserId}`;
   const session = await mongoose.startSession();
   try {
     let useTransaction = true;
@@ -19,7 +20,7 @@ async function createDeliveryAndJobAtomic({
     await session.withTransaction(async () => {
       // create Delivery (enforces uniqueness)
       await Delivery.create([{ ruleId, recipientUserId }], { session });
-      // create DMJob
+      // create DMJob (persist idempotencyKey)
       await DMJob.create(
         [
           {
@@ -27,6 +28,7 @@ async function createDeliveryAndJobAtomic({
             eventId,
             commentId,
             recipientUserId,
+            idempotencyKey,
             message,
             status: "queued",
             attempts: 0,
@@ -64,17 +66,26 @@ async function createDeliveryAndJobAtomic({
           throw de;
         }
 
-        // Delivery created successfully, now create the DMJob
-        await DMJob.create({
-          ruleId,
-          eventId,
-          commentId,
-          recipientUserId,
-          message,
-          status: "queued",
-          attempts: 0,
-          nextAttemptAt: new Date(),
-        });
+        // Delivery created successfully, now create the DMJob (include idempotencyKey)
+        try {
+          await DMJob.create({
+            ruleId,
+            eventId,
+            commentId,
+            recipientUserId,
+            idempotencyKey,
+            message,
+            status: "queued",
+            attempts: 0,
+            nextAttemptAt: new Date(),
+          });
+        } catch (eCreate) {
+          // if DMJob create races due to unique index, treat as duplicate
+          if (eCreate && eCreate.code === 11000) {
+            return { created: false, duplicate: true };
+          }
+          throw eCreate;
+        }
         return { created: true };
       } catch (e2) {
         if (e2 && e2.code === 11000) {

@@ -70,9 +70,11 @@ export default function App() {
             <RuleForm base={BASE} onSuccess={handleAddRule} />
           </div>
 
-          <div className="card">
-            <h3 className="text-lg font-semibold mb-3">Webhook Testing</h3>
-            <WebhookTest />
+          <div className="card flex flex-col">
+            <h3 className="text-lg font-semibold mb-3">Live Instagram Demo</h3>
+            <div className="flex-1">
+              <WebhookTest rules={rules} />
+            </div>
           </div>
         </div>
 

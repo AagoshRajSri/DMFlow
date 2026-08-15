@@ -133,10 +133,21 @@ async function processWebhookEventById(eventId) {
   }
 
   const rules = await Rule.find({ active: true }).lean();
+
+  console.log("RULE CHECK", {
+    eventId,
+    text,
+    rules: rules.map((r) => ({
+      id: r._id.toString(),
+      keyword: r.keyword,
+      active: r.active,
+    })),
+  });
+
   for (const rule of rules) {
     if (!rule.keyword) continue;
     if (text.toLowerCase().includes(rule.keyword.toLowerCase())) {
-      console.log("MATCHED RULE:", {
+      console.log("MATCHED RULE", {
         ruleId: rule._id.toString(),
         keyword: rule.keyword,
         text,

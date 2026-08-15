@@ -11,15 +11,17 @@ function jitter(min, max) {
 }
 
 function createLimiter() {
-  const reservoir = Number(process.env.PSEUDOGRAM_RATE_LIMIT || 8);
+  const reservoir = Number(process.env.PSEUDOGRAM_RATE_LIMIT || 60);
   const reservoirRefreshInterval = Number(
     process.env.PSEUDOGRAM_RATE_INTERVAL_MS || 60000,
   );
+  const maxConcurrent = Number(process.env.PSEUDOGRAM_MAX_CONCURRENT || 5);
+  console.log("PseudoGram limiter settings:", { reservoir, reservoirRefreshInterval, maxConcurrent });
   return new Bottleneck({
     reservoir,
     reservoirRefreshAmount: reservoir,
     reservoirRefreshInterval,
-    maxConcurrent: 1,
+    maxConcurrent,
   });
 }
 
@@ -40,112 +42,91 @@ async function processOne(client) {
     { $set: { status: "processing", updatedAt: new Date() } },
     { sort: { nextAttemptAt: 1 }, new: true },
   );
-  if (!job) {
-    return false;
-  }
+  if (!job) return false;
 
-  console.log(
-    "WORKER PICKED JOB:",
-    job._id.toString(),
-    job.recipientUserId,
-    job.status,
-  );
-  const j = job;
+  console.log("WORKER PICKED JOB:", job._id.toString(), job.recipientUserId, job.status);
 
-  // We do not increment attempts before calling the API to avoid counting 429s
-  const maxRetries = Number(process.env.MAX_DM_RETRIES || 5);
-  const idempotencyKey = `${j.ruleId.toString()}:${j.recipientUserId}`;
-  const payload = {
-    recipient_user_id: j.recipientUserId,
-    message: j.message,
-    comment_id: j.commentId,
-  };
+  // spawn an independent handler so the loop can keep claiming jobs.
+  (async function handleSend(j) {
+    const maxRetries = Number(process.env.MAX_DM_RETRIES || 5);
+    const idempotencyKey = `${j.ruleId.toString()}:${j.recipientUserId}`;
+    const payload = {
+      recipient_user_id: j.recipientUserId,
+      message: j.message,
+      comment_id: j.commentId,
+    };
 
-  try {
-    console.log("DM REQUEST", { jobId: j._id.toString(), recipient: j.recipientUserId });
-    const resp = await client.sendDM(payload, idempotencyKey);
-    console.log("DM RESPONSE", { jobId: j._id.toString(), status: resp.status });
+    try {
+      console.log("DM REQUEST", { jobId: j._id.toString(), recipient: j.recipientUserId });
+      const resp = await client.sendDM(payload, idempotencyKey);
+      console.log("DM RESPONSE", { jobId: j._id.toString(), status: resp.status });
 
-    // Handle rate limited explicitly: do NOT increment attempts
-    if (resp.status === 429) {
-      const ra = resp.headers["retry-after"];
-      const wait = ra ? Number(ra) * 1000 : Number(process.env.PSEUDOGRAM_RATE_INTERVAL_MS || 60000);
-      j.status = "queued";
-      j.nextAttemptAt = new Date(Date.now() + wait);
-      await j.save();
-      console.log("JOB RATE LIMITED", j._id.toString(), "retryAt=", j.nextAttemptAt.toISOString());
-      return true;
-    }
+      if (resp.status === 429) {
+        const ra = resp.headers["retry-after"];
+        const wait = ra ? Number(ra) * 1000 : Number(process.env.PSEUDOGRAM_RATE_INTERVAL_MS || 60000);
+        await DMJob.findByIdAndUpdate(j._id, { $set: { status: "queued", nextAttemptAt: new Date(Date.now() + wait), updatedAt: new Date() } });
+        console.log("JOB RATE LIMITED", j._id.toString(), "retryAt=", new Date(Date.now() + wait).toISOString());
+        return;
+      }
 
-    // For non-429 responses, increment attempts because an attempt was consumed
-    j.attempts = (j.attempts || 0) + 1;
+      // increment attempts for non-429 cases (actual attempt consumed)
+      const attempts = (j.attempts || 0) + 1;
 
-    if (resp.status === 202 || resp.status === 200 || resp.status === 201) {
-      const data = resp.data || {};
-      j.dmId = data.dm_id || data.id || null;
-      j.status = "accepted";
-      await j.save();
+      if (resp.status === 202 || resp.status === 200 || resp.status === 201) {
+        const data = resp.data || {};
+        const dmId = data.dm_id || data.id || null;
+        await DMJob.findByIdAndUpdate(j._id, { $set: { status: "accepted", dmId, attempts, updatedAt: new Date() } });
 
-      // Atomic upsert for Delivery: create if not exists
-      try {
-        const upsertRes = await Delivery.updateOne(
-          { ruleId: j.ruleId, recipientUserId: j.recipientUserId },
-          { $setOnInsert: { ruleId: j.ruleId, recipientUserId: j.recipientUserId, status: "queued", createdAt: new Date() } },
-          { upsert: true },
-        );
-        // If already existed, record duplicate_blocked state for visibility
-        if (upsertRes && upsertRes.upsertedCount === 0) {
-          // delivery existed
-          console.log("DUPLICATE BLOCKED (delivery exists)", j.ruleId.toString(), j.recipientUserId);
+        try {
+          const upsertRes = await Delivery.updateOne(
+            { ruleId: j.ruleId, recipientUserId: j.recipientUserId },
+            { $setOnInsert: { ruleId: j.ruleId, recipientUserId: j.recipientUserId, status: "queued", createdAt: new Date() } },
+            { upsert: true },
+          );
+          if (upsertRes && upsertRes.upsertedCount === 0) {
+            console.log("DUPLICATE BLOCKED (delivery exists)", j.ruleId.toString(), j.recipientUserId);
+          }
+        } catch (err) {
+          console.error("delivery upsert error", err && err.message ? err.message : err);
         }
-      } catch (err) {
-        console.error("delivery upsert error", err && err.message ? err.message : err);
+
+        console.log("JOB ACCEPTED", j._id.toString(), j.recipientUserId);
+        return;
       }
 
-      console.log("JOB ACCEPTED", j._id.toString(), j.recipientUserId);
-      return true;
-    }
+      if (resp.status >= 500 && resp.status < 600) {
+        const backoff = Math.min(30000, 500 * Math.pow(2, attempts));
+        const next = backoff + jitter(0, 1000);
+        if (attempts >= maxRetries) {
+          await DMJob.findByIdAndUpdate(j._id, { $set: { status: "failed", lastError: `status_${resp.status}`, attempts, updatedAt: new Date() } });
+          console.log("JOB FAILED", j._id.toString(), `status_${resp.status}`);
+        } else {
+          await DMJob.findByIdAndUpdate(j._id, { $set: { status: "queued", nextAttemptAt: new Date(Date.now() + next), attempts, updatedAt: new Date() } });
+          console.log("JOB RETRY", j._id.toString(), "nextAttemptAt=", new Date(Date.now() + next).toISOString());
+        }
+        return;
+      }
 
-    if (resp.status >= 500 && resp.status < 600) {
-      // schedule retry with exponential backoff + jitter
-      const backoff = Math.min(30000, 500 * Math.pow(2, j.attempts));
-      const next = backoff + jitter(0, 1000);
-      if (j.attempts >= maxRetries) {
-        j.status = "failed";
-        j.lastError = `status_${resp.status}`;
-        console.log("JOB FAILED", j._id.toString(), `status_${resp.status}`);
+      // other 4xx -> do not retry
+      await DMJob.findByIdAndUpdate(j._id, { $set: { status: "failed", lastError: `status_${resp.status}`, attempts, updatedAt: new Date() } });
+      console.log("JOB FAILED", j._id.toString(), `status_${resp.status}`);
+      return;
+    } catch (err) {
+      console.error("DM SEND ERROR", { jobId: j._id.toString(), err: err && err.message ? err.message : String(err) });
+      const attempts = (j.attempts || 0) + 1;
+      const backoff = Math.min(30000, 500 * Math.pow(2, attempts));
+      if (attempts >= maxRetries) {
+        await DMJob.findByIdAndUpdate(j._id, { $set: { status: "failed", lastError: err.message, attempts, updatedAt: new Date() } });
+        console.log("JOB FAILED", j._id.toString(), err && err.message ? err.message : err);
       } else {
-        j.status = "queued";
-        j.nextAttemptAt = new Date(Date.now() + next);
-        console.log("JOB RETRY", j._id.toString(), "nextAttemptAt=", j.nextAttemptAt.toISOString());
+        await DMJob.findByIdAndUpdate(j._id, { $set: { status: "queued", nextAttemptAt: new Date(Date.now() + backoff), attempts, updatedAt: new Date() } });
+        console.log("JOB RETRY", j._id.toString(), "nextAttemptAt=", new Date(Date.now() + backoff).toISOString());
       }
-      await j.save();
-      return true;
+      return;
     }
+  })(job).catch((e) => console.error("handleSend fatal", e && e.message ? e.message : e));
 
-    // other 4xx -> do not retry
-    j.status = "failed";
-    j.lastError = `status_${resp.status}`;
-    await j.save();
-    console.log("JOB FAILED", j._id.toString(), `status_${resp.status}`);
-    return true;
-  } catch (err) {
-    // network or unexpected
-    console.error("DM SEND ERROR", { jobId: j._id.toString(), err: err && err.message ? err.message : String(err) });
-    j.attempts = (j.attempts || 0) + 1;
-    const backoff = Math.min(30000, 500 * Math.pow(2, j.attempts));
-    if (j.attempts >= maxRetries) {
-      j.status = "failed";
-      j.lastError = err.message;
-      console.log("JOB FAILED", j._id.toString(), err && err.message ? err.message : err);
-    } else {
-      j.status = "queued";
-      j.nextAttemptAt = new Date(Date.now() + backoff);
-      console.log("JOB RETRY", j._id.toString(), "nextAttemptAt=", j.nextAttemptAt.toISOString());
-    }
-    await j.save();
-    return true;
-  }
+  return true;
 }
 
 async function reconciliationLoop(client) {

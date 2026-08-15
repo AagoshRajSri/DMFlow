@@ -23,7 +23,7 @@ export default function App() {
 
   const fetchHealth = async () => {
     try {
-      await axios.get(`${BASE}/health`, { timeout: 3000 });
+      await axios.get(`${BASE}/stats`, { timeout: 4000 });
       setBackendOnline(true);
     } catch (e) {
       setBackendOnline(false);
@@ -35,8 +35,9 @@ export default function App() {
     try {
       const res = await axios.get(`${BASE}/stats`);
       setStats(res.data);
+      setBackendOnline(true);
     } catch (e) {
-      // keep existing stats
+      setBackendOnline(false);
     } finally {
       setLoadingStats(false);
     }

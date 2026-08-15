@@ -3,9 +3,12 @@ import React from "react";
 export default function Header({ online, fetchHealth }) {
   return (
     <header className="flex items-center justify-between">
-      <div>
-        <h1 className="text-2xl font-bold">DMFlow</h1>
-        <p className="text-sm text-gray-400">Comment → Match → DM</p>
+      <div className="brand">
+        <div className="brand-logo">DF</div>
+        <div>
+          <div className="text-2xl font-semibold">DMFlow</div>
+          <div className="text-sm text-gray-400">Automations • DMs • Replies</div>
+        </div>
       </div>
 
       <div className="flex items-center space-x-3">

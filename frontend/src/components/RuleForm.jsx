@@ -36,37 +36,38 @@ export default function RuleForm({ base, onSuccess }) {
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <label className="block text-sm text-gray-300">Keyword</label>
+      <label className="block text-sm text-gray-300">Trigger Keyword</label>
       <input
         className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2"
         value={keyword}
         onChange={(e) => setKeyword(e.target.value)}
-        placeholder="hello"
+        placeholder="e.g. interested, help, pricing"
       />
 
-      <label className="block text-sm text-gray-300">DM Message</label>
+      <label className="block text-sm text-gray-300">Automation DM</label>
       <textarea
         className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 h-28"
         value={dm}
         onChange={(e) => setDm(e.target.value)}
-        placeholder="Thanks for commenting!"
+        placeholder="Hi! Thanks for your comment — I'd love to help. Can you share more details?"
       />
 
-      <div className="flex items-center space-x-3">
-        <button
-          type="submit"
-          className="px-4 py-2 bg-emerald-500 text-black font-semibold rounded-md disabled:opacity-60"
-          disabled={loading}
-        >
-          {loading ? "Creating…" : "Create Rule"}
-        </button>
-        {message && (
-          <div
-            className={`${message.type === "error" ? "text-red-400" : "text-emerald-300"} text-sm`}
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-gray-400">Your rule will send this DM automatically when the keyword is found.</div>
+        <div className="flex items-center space-x-3">
+          {message && (
+            <div className={`${message.type === "error" ? "text-red-400" : "text-emerald-300"} text-sm`}>
+              {message.text}
+            </div>
+          )}
+          <button
+            type="submit"
+            className="btn-gradient"
+            disabled={loading}
           >
-            {message.text}
-          </div>
-        )}
+            {loading ? "Creating…" : "Create Rule"}
+          </button>
+        </div>
       </div>
     </form>
   );

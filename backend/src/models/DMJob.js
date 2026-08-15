@@ -10,7 +10,7 @@ const DMJobSchema = new mongoose.Schema(
     eventId: { type: String },
     commentId: { type: String },
     recipientUserId: { type: String, required: true },
-      idempotencyKey: { type: String, index: true },
+    idempotencyKey: { type: String, index: true },
     message: { type: String, required: true },
     status: {
       type: String,
@@ -32,7 +32,12 @@ DMJobSchema.index({ status: 1, nextAttemptAt: 1 });
 // this is a partial unique index so historical/failed/delivered rows are allowed
 DMJobSchema.index(
   { idempotencyKey: 1 },
-  { unique: true, partialFilterExpression: { status: { $in: ["queued", "processing", "accepted"] } } },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: { $in: ["queued", "processing", "accepted"] },
+    },
+  },
 );
 
 module.exports = mongoose.model("DMJob", DMJobSchema);

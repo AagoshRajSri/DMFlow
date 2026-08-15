@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "LinkPlease webhook + DM relay (single-file)",
   "main": "server.js",
-  "main": "server.js",
   "engines": {
     "node": ">=18"
   },

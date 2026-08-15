@@ -53,18 +53,18 @@ export default function RuleForm({ base, onSuccess }) {
       />
 
       <div className="flex items-center justify-between">
-        <div className="text-xs text-gray-400">Your rule will send this DM automatically when the keyword is found.</div>
+        <div className="text-xs text-gray-400">
+          Your rule will send this DM automatically when the keyword is found.
+        </div>
         <div className="flex items-center space-x-3">
           {message && (
-            <div className={`${message.type === "error" ? "text-red-400" : "text-emerald-300"} text-sm`}>
+            <div
+              className={`${message.type === "error" ? "text-red-400" : "text-emerald-300"} text-sm`}
+            >
               {message.text}
             </div>
           )}
-          <button
-            type="submit"
-            className="btn-gradient"
-            disabled={loading}
-          >
+          <button type="submit" className="btn-gradient" disabled={loading}>
             {loading ? "Creating…" : "Create Rule"}
           </button>
         </div>

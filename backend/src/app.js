@@ -1,10 +1,10 @@
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
+const mongoose = require("mongoose");
 
 const Rule = require("./models/Rule");
 const WebhookEvent = require("./models/WebhookEvent");
-const Delivery = require("./models/Delivery");
 const DMJob = require("./models/DMJob");
 const { verifySignature } = require("./utils/signature");
 
@@ -129,31 +129,23 @@ app.post(
               eventId,
             });
             try {
-              const result = await createDeliveryAndJobAtomic({
+              await createDeliveryAndJobAtomic({
                 ruleId: rule._id,
                 recipientUserId,
                 eventId,
                 commentId,
                 message: rule.dmMessage,
               });
-
-              if (result.duplicate) {
-                await DMJob.create({
-                  ruleId: rule._id,
-                  eventId,
-                  commentId,
-                  recipientUserId,
-                  message: rule.dmMessage,
-                  status: "failed",
-                  attempts: 0,
-                  lastError: "duplicate_blocked",
-                }).catch(() => {});
-              }
             } catch (err) {
               console.error("enqueue error", err);
             }
           }
         }
+        // Mark event processed so restart recovery skips it
+        await WebhookEvent.updateOne(
+          { eventId },
+          { $set: { processed: true, processedAt: new Date() } },
+        ).catch((e) => console.error("mark processed error", e));
       } catch (err) {
         console.error("async processing error", err);
       }
@@ -196,37 +188,25 @@ app.post("/rules", async (req, res) => {
 
 app.get("/stats", async (_req, res) => {
   try {
-    const sent = await Delivery.countDocuments({
-      status: "delivered",
-    });
+    const sent = await DMJob.countDocuments({ status: "delivered" });
 
-    const failed = await Delivery.countDocuments({
-      status: "failed",
-    });
+    const failed = await DMJob.countDocuments({ status: "failed" });
 
     const queued = await DMJob.countDocuments({
-      status: {
-        $in: ["queued", "processing", "accepted"],
-      },
+      status: { $in: ["queued", "processing", "accepted"] },
     });
 
-    const duplicates_blocked = await DMJob.countDocuments({
-      status: "failed",
-      lastError: "duplicate_blocked",
-    });
+    // Read the honest duplicate counter (incremented in processor.js)
+    const db = mongoose.connection.db;
+    const statsDoc = db
+      ? await db.collection("stats").findOne({ _id: "global" })
+      : null;
+    const duplicates_blocked = statsDoc ? statsDoc.duplicates_blocked || 0 : 0;
 
-    res.json({
-      sent,
-      failed,
-      queued,
-      duplicates_blocked,
-    });
+    res.json({ sent, failed, queued, duplicates_blocked });
   } catch (err) {
     console.error(err);
-
-    res.status(500).json({
-      error: "internal_error",
-    });
+    res.status(500).json({ error: "internal_error" });
   }
 });
 
@@ -266,4 +246,3 @@ app.get("/debug/jobs", async (_req, res) => {
 });
 
 module.exports = app;
-``;

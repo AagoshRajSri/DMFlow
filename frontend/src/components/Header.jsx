@@ -7,7 +7,9 @@ export default function Header({ online, fetchHealth }) {
         <div className="brand-logo">DF</div>
         <div>
           <div className="text-2xl font-semibold">DMFlow</div>
-          <div className="text-sm text-gray-400">Automations • DMs • Replies</div>
+          <div className="text-sm text-gray-400">
+            Automations • DMs • Replies
+          </div>
         </div>
       </div>
 

@@ -18,11 +18,15 @@ body {
     Arial;
 }
 .card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-  border: 1px solid rgba(255,255,255,0.04);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.02),
+    rgba(255, 255, 255, 0.01)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 0.75rem;
   padding: 1rem;
-  box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+  box-shadow: 0 6px 18px rgba(2, 6, 23, 0.6);
 }
 /* DM bubble styles */
 .dm-list {
@@ -39,7 +43,7 @@ body {
   width: 40px;
   height: 40px;
   border-radius: 9999px;
-  background: linear-gradient(135deg,#8b5cf6,#06b6d4);
+  background: linear-gradient(135deg, #8b5cf6, #06b6d4);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -50,13 +54,13 @@ body {
   max-width: 70%;
   padding: 0.6rem 0.9rem;
   border-radius: 14px;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
   color: #e6eef8;
-  border: 1px solid rgba(255,255,255,0.03);
+  border: 1px solid rgba(255, 255, 255, 0.03);
 }
 .dm-bubble.me {
   margin-left: auto;
-  background: linear-gradient(90deg,#4ade80,#06b6d4);
+  background: linear-gradient(90deg, #4ade80, #06b6d4);
   color: #041014;
 }
 .brand {
@@ -68,7 +72,7 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: linear-gradient(135deg,#ff7ab6,#7c3aed);
+  background: linear-gradient(135deg, #ff7ab6, #7c3aed);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -76,25 +80,25 @@ body {
   font-weight: 700;
 }
 .pill {
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
   padding: 0.25rem 0.6rem;
   border-radius: 9999px;
   font-size: 0.8rem;
   color: #cfe8ff;
-  border: 1px solid rgba(255,255,255,0.02);
+  border: 1px solid rgba(255, 255, 255, 0.02);
 }
 .btn-gradient {
-  background: linear-gradient(90deg,#7c3aed,#06b6d4);
+  background: linear-gradient(90deg, #7c3aed, #06b6d4);
   color: white;
   border-radius: 9999px;
   padding: 0.5rem 0.9rem;
   border: none;
 }
 .stat-chip {
-  background: rgba(255,255,255,0.02);
+  background: rgba(255, 255, 255, 0.02);
   padding: 0.6rem 0.8rem;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.02);
+  border: 1px solid rgba(255, 255, 255, 0.02);
   text-align: center;
 }
 .text-sm {

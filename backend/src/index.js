@@ -41,7 +41,12 @@ const cors = require("cors");
 const crypto = require("crypto");
 const app = require("./app");
 const DMJob = require("./models/DMJob");
-const { processOne, reconciliationLoop, buildClient, recoverStaleProcessing } = require("./worker");
+const {
+  processOne,
+  reconciliationLoop,
+  buildClient,
+  recoverStaleProcessing,
+} = require("./worker");
 
 const PORT = process.env.PORT || 3000;
 

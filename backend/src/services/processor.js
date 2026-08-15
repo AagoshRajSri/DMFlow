@@ -4,6 +4,21 @@ const WebhookEvent = require("../models/WebhookEvent");
 const Delivery = require("../models/Delivery");
 const DMJob = require("../models/DMJob");
 
+async function incrementDuplicatesBlocked() {
+  try {
+    const db = mongoose.connection.db;
+    if (!db) return;
+    await db.collection("stats").updateOne(
+      { _id: "global" },
+      { $inc: { duplicates_blocked: 1 } },
+      { upsert: true },
+    );
+  } catch (e) {
+    // non-critical — don't let this break the main flow
+    console.error("incrementDuplicatesBlocked error", e && e.message ? e.message : e);
+  }
+}
+
 async function createDeliveryAndJobAtomic({
   ruleId,
   recipientUserId,
@@ -60,7 +75,8 @@ async function createDeliveryAndJobAtomic({
           await Delivery.create({ ruleId, recipientUserId });
         } catch (de) {
           if (de && de.code === 11000) {
-            // Delivery already exists -> treat as duplicate, do not create any DMJob
+            // Delivery already exists -> duplicate, never send a second DM
+            await incrementDuplicatesBlocked();
             return { created: false, duplicate: true };
           }
           throw de;
@@ -97,6 +113,7 @@ async function createDeliveryAndJobAtomic({
 
     // duplicate Delivery (someone else created it)
     if (err.code === 11000) {
+      await incrementDuplicatesBlocked();
       return { created: false, duplicate: true };
     }
 

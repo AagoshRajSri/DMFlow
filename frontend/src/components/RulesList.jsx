@@ -19,7 +19,9 @@ export default function RulesList({ rules }) {
               <div className="font-medium">{r.keyword}</div>
             </div>
             <div className="dm-bubble me mt-2">{r.dm_message}</div>
-            <div className="text-xs text-gray-400 mt-1">ID: <span className="break-words">{r._id || r.id || "—"}</span></div>
+            <div className="text-xs text-gray-400 mt-1">
+              ID: <span className="break-words">{r._id || r.id || "—"}</span>
+            </div>
           </div>
         </div>
       ))}

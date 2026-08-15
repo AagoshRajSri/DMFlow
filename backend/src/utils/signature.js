@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const crypto = require("crypto");
 
 function timingSafeCompare(a, b) {
   const bufA = Buffer.from(a);
@@ -12,7 +12,7 @@ function verifySignature(rawBody, signatureHeader, apiKey) {
   const match = /^sha256=(.+)$/.exec(signatureHeader);
   if (!match) return false;
   const sig = match[1];
-  const h = crypto.createHmac('sha256', apiKey).update(rawBody).digest('hex');
+  const h = crypto.createHmac("sha256", apiKey).update(rawBody).digest("hex");
   return timingSafeCompare(h, sig);
 }
 

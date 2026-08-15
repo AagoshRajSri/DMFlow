@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const WebhookEventSchema = new mongoose.Schema({
   eventId: { type: String, required: true, unique: true },
@@ -10,4 +10,4 @@ const WebhookEventSchema = new mongoose.Schema({
   processedAt: { type: Date },
 });
 
-module.exports = mongoose.model('WebhookEvent', WebhookEventSchema);
+module.exports = mongoose.model("WebhookEvent", WebhookEventSchema);

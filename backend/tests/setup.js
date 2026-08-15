@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const mongoose = require("mongoose");
+const { MongoMemoryServer } = require("mongodb-memory-server");
 
 let mongod;
 module.exports = {
@@ -11,5 +11,5 @@ module.exports = {
   async teardown() {
     await mongoose.disconnect();
     if (mongod) await mongod.stop();
-  }
+  },
 };

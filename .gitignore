@@ -19,3 +19,4 @@ build/
 # IDEs
 .vscode/
 .DS_Store
+.vercel

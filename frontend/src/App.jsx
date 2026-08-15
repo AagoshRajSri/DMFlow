@@ -6,7 +6,8 @@ import RuleForm from "./components/RuleForm";
 import RulesList from "./components/RulesList";
 import WebhookTest from "./components/WebhookTest";
 
-const BASE = import.meta.env.VITE_API_BASE || "https://dmflow-wgoy.onrender.com";
+const BASE =
+  import.meta.env.VITE_API_BASE || "https://dmflow-wgoy.onrender.com";
 
 export default function App() {
   const [backendOnline, setBackendOnline] = useState(false);

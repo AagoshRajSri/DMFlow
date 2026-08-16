@@ -35,45 +35,45 @@ export default function RuleForm({ base, onSuccess }) {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-5 bg-[#121212] p-6 rounded-3xl border border-[#262626]">
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Trigger Keyword</label>
+        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">When user comments this keyword...</label>
         <input
-          className="w-full bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-gray-600"
+          className="w-full bg-[#000000] border border-[#262626] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all placeholder:text-gray-700 font-medium"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          placeholder="e.g. interested, help, pricing"
+          placeholder="e.g. link, price, guide"
         />
       </div>
 
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Automation DM</label>
+        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Send this automated DM</label>
         <textarea
-          className="w-full bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 h-28 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-gray-600 resize-none"
+          className="w-full bg-[#000000] border border-[#262626] rounded-xl px-4 py-3 h-28 text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all placeholder:text-gray-700 resize-none font-medium"
           value={dm}
           onChange={(e) => setDm(e.target.value)}
-          placeholder="Hi! Thanks for your comment — I'd love to help. Can you share more details?"
+          placeholder="Hey! Thanks for commenting. Here is the link you asked for..."
         />
       </div>
 
-      <div className="flex items-center justify-between pt-2">
-        <div className="text-xs text-gray-500 max-w-[50%]">
-          Your rule will send this DM automatically when the keyword is found.
+      <div className="flex items-center justify-between pt-3 border-t border-[#262626]">
+        <div className="text-xs text-gray-500 font-medium max-w-[50%]">
+          Active instantly upon creation.
         </div>
         <div className="flex items-center space-x-3">
           {message && (
             <div
-              className={`${message.type === "error" ? "text-red-400" : "text-emerald-400"} text-sm font-medium animate-pulse`}
+              className={`${message.type === "error" ? "text-red-500" : "text-emerald-500"} text-sm font-bold animate-pulse`}
             >
               {message.text}
             </div>
           )}
           <button 
             type="submit" 
-            className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium px-6 py-2 rounded-full hover:shadow-[0_0_15px_rgba(99,102,241,0.5)] transition-all disabled:opacity-50 disabled:hover:shadow-none" 
+            className="ig-gradient text-white font-bold px-6 py-2.5 rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 shadow-lg" 
             disabled={loading}
           >
-            {loading ? "Creating…" : "Create Rule"}
+            {loading ? "Saving…" : "Save Automation"}
           </button>
         </div>
       </div>

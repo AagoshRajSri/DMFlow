@@ -18,6 +18,8 @@ _Last updated: 2026-08-16_
 | Crash recovery via `processPendingWebhookEvents` | ✅ Working |
 | Stale job recovery via `recoverStaleProcessing` | ✅ Working |
 | Honest `GET /stats` from DB counters | ✅ Working |
+| UI Rule Synchronization (`GET /rules`) | ✅ Working |
+| Live Mockup Webhook Trigger (`/debug/trigger-webhook`) | ✅ Working |
 
 ---
 

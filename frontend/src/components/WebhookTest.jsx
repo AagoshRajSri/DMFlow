@@ -1,6 +1,7 @@
 import React, { useState } from "react";
+import axios from "axios";
 
-export default function WebhookTest({ rules = [] }) {
+export default function WebhookTest({ rules = [], base }) {
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState([
     { id: 1, user: "random_user", text: "Love this content! 🔥" }
@@ -11,16 +12,17 @@ export default function WebhookTest({ rules = [] }) {
     e.preventDefault();
     if (!commentText.trim()) return;
 
+    const textToSubmit = commentText.trim();
     const newComment = {
       id: Date.now(),
       user: "you",
-      text: commentText
+      text: textToSubmit
     };
 
     setComments((prev) => [...prev, newComment]);
     
     const matchedRule = rules.find((r) => 
-      commentText.toLowerCase().includes(r.keyword.toLowerCase())
+      textToSubmit.toLowerCase().includes(r.keyword.toLowerCase())
     );
 
     if (matchedRule) {
@@ -28,6 +30,22 @@ export default function WebhookTest({ rules = [] }) {
         setDmNotification(`DMFlow: ${matchedRule.dm_message}`);
         setTimeout(() => setDmNotification(null), 5000);
       }, 800);
+    }
+
+    if (base) {
+      axios.post(`${base}/debug/trigger-webhook`, {
+        event_type: "comment.created",
+        data: {
+          comment_id: "cmt_" + Math.random().toString(36).substring(2, 9),
+          text: textToSubmit,
+          from: {
+            user_id: "usr_test_user_1",
+            username: "tester"
+          }
+        }
+      }).catch(err => {
+        console.error("Failed to trigger webhook", err);
+      });
     }
 
     setCommentText("");

@@ -43,9 +43,19 @@ export default function App() {
     }
   };
 
+  const fetchRules = async () => {
+    try {
+      const res = await axios.get(`${BASE}/rules`);
+      setRules(res.data);
+    } catch (e) {
+      console.error("Failed to fetch rules", e);
+    }
+  };
+
   useEffect(() => {
     fetchHealth();
     fetchStats(false);
+    fetchRules();
     statsTimer.current = setInterval(() => fetchStats(true), 5000);
     return () => clearInterval(statsTimer.current);
   }, []);
@@ -72,7 +82,7 @@ export default function App() {
           <div className="card flex flex-col">
             <h3 className="text-lg font-semibold mb-3">Live Instagram Demo</h3>
             <div className="flex-1">
-              <WebhookTest rules={rules} />
+              <WebhookTest rules={rules} base={BASE} />
             </div>
           </div>
         </div>

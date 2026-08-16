@@ -182,6 +182,23 @@ app.post("/rules", async (req, res) => {
   }
 });
 
+app.get("/rules", async (_req, res) => {
+  try {
+    const rules = await Rule.find({ active: true }).sort({ createdAt: -1 });
+    res.json(
+      rules.map((r) => ({
+        rule_id: r._id.toString(),
+        keyword: r.keyword,
+        dm_message: r.dmMessage,
+        active: r.active,
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal_error" });
+  }
+});
+
 app.get("/stats", async (_req, res) => {
   try {
     const sent = await DMJob.countDocuments({ status: "delivered" });
@@ -236,6 +253,47 @@ app.get("/debug/jobs", async (_req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "internal_error" });
+  }
+});
+
+app.post("/debug/trigger-webhook", async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const crypto = require("crypto");
+    const eventId =
+      payload.event_id ||
+      payload.eventId ||
+      "evt_ui_" + crypto.randomBytes(8).toString("hex");
+
+    payload.event_id = eventId;
+
+    try {
+      await WebhookEvent.create({
+        eventId,
+        eventType: payload.event_type || payload.eventType,
+        payload,
+        receivedAt: new Date(),
+      });
+    } catch (err) {
+      if (err.code === 11000) {
+        return res.status(200).send("OK");
+      }
+      throw err;
+    }
+
+    res.status(200).send("OK");
+
+    (async () => {
+      try {
+        const { processWebhookEventById } = require("./services/processor");
+        await processWebhookEventById(eventId);
+      } catch (err) {
+        console.error("async debug processing error", err);
+      }
+    })();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal_error", message: err.message });
   }
 });
 

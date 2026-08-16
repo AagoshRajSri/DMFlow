@@ -45,13 +45,12 @@ export default function App() {
 
   useEffect(() => {
     fetchHealth();
-    fetchStats(false); // initial load shows loading state
-    statsTimer.current = setInterval(() => fetchStats(true), 5000); // background polls do not show loading
+    fetchStats(false);
+    statsTimer.current = setInterval(() => fetchStats(true), 5000);
     return () => clearInterval(statsTimer.current);
   }, []);
 
   const handleAddRule = (rule) => {
-    // store in frontend session state
     setRules((r) => [rule, ...r]);
   };
 

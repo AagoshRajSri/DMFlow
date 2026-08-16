@@ -2,9 +2,6 @@ const Bottleneck = require("bottleneck");
 const DMJob = require("./models/DMJob");
 const Delivery = require("./models/Delivery");
 const PseudoGramClient = require("./pseudogramClient");
-const axios = require("axios");
-
-// MAX_RETRIES will be read at runtime to respect env changes
 
 function jitter(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -76,7 +73,6 @@ async function handleSend(client, j) {
       return;
     }
 
-    // increment attempts for non-429 cases (actual attempt consumed)
     const attempts = (j.attempts || 0) + 1;
 
     if (resp.status === 202 || resp.status === 200 || resp.status === 201) {
@@ -152,7 +148,6 @@ async function handleSend(client, j) {
       return;
     }
 
-    // other 4xx -> do not retry
     await DMJob.findByIdAndUpdate(j._id, {
       $set: {
         status: "failed",
@@ -206,7 +201,6 @@ async function handleSend(client, j) {
     return;
   } finally {
     try {
-      // ensure the job never stays 'processing' due to an unexpected exception
       if (!updated) {
         const cur = await DMJob.findById(j._id).lean();
         if (cur && cur.status === "processing") {
@@ -246,8 +240,6 @@ async function processOne(client) {
 
   console.log("WORKER CLAIMED JOB", job._id.toString());
 
-  // Await the handler so all DB writes settle before returning.
-  // The worker loop is single-goroutine so this doesn't reduce throughput.
   await handleSend(client, job).catch((e) =>
     console.error("handleSend fatal", e && e.message ? e.message : e),
   );
@@ -255,9 +247,7 @@ async function processOne(client) {
   return true;
 }
 
-
 async function reconciliationLoop(client) {
-  // find accepted jobs with dmId
   const accepted = await DMJob.find({
     status: "accepted",
     dmId: { $exists: true, $ne: null },
@@ -277,7 +267,6 @@ async function reconciliationLoop(client) {
             { $set: { status: "delivered", lastUpdatedAt: new Date() } },
           ).catch(() => {});
         } else if (st === "failed") {
-          // schedule retry unless attempts exhausted
           const maxRetries = Number(process.env.MAX_DM_RETRIES || 5);
           if (j.attempts >= maxRetries) {
             j.status = "failed";
@@ -296,7 +285,7 @@ async function reconciliationLoop(client) {
         }
       }
     } catch (err) {
-      // ignore and continue
+      // intentionally silent per-job errors during reconciliation
     }
   }
 }
@@ -304,7 +293,6 @@ async function reconciliationLoop(client) {
 async function recoverStaleProcessing() {
   const timeout = Number(process.env.PROCESSING_TIMEOUT_MS || 120000);
   const staleBefore = new Date(Date.now() - timeout);
-  // find stale processing jobs without a confirmed dmId
   const stale = await DMJob.find({
     status: "processing",
     processingStartedAt: { $lte: staleBefore },
@@ -326,7 +314,7 @@ async function recoverStaleProcessing() {
       );
       console.log("RECOVERED STALE JOB", s._id.toString());
     } catch (err) {
-      // ignore per-job errors
+      // intentionally silent per-job errors
     }
   }
 }

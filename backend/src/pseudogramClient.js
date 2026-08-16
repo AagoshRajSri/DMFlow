@@ -4,12 +4,11 @@ class PseudoGramClient {
   constructor({ baseURL, apiKey, limiter }) {
     this.axios = axios.create({ baseURL, timeout: 10000 });
     this.apiKey = apiKey;
-    this.limiter = limiter; // Bottleneck instance
+    this.limiter = limiter;
   }
 
   async sendDM(payload, idempotencyKey) {
     const fn = async () => {
-      // execute the HTTP request; validateStatus allows handling in caller
       const resp = await this.axios.post("/v1/dm/send", payload, {
         headers: {
           "X-API-Key": this.apiKey,
@@ -49,7 +48,6 @@ class PseudoGramClient {
   }
 
   async getDMStatus(dmId) {
-    // GET status should NOT count against the DM send rate limit
     const resp = await this.axios.get(`/v1/dm/${encodeURIComponent(dmId)}`, {
       headers: { "X-API-Key": this.apiKey },
       validateStatus: () => true,

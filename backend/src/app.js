@@ -17,7 +17,6 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-// Webhook must come BEFORE express.json()
 app.post(
   "/webhook",
   express.raw({ type: "application/json", limit: "256kb" }),
@@ -72,10 +71,8 @@ app.post(
       return res.status(500).json({ error: "internal_error" });
     }
 
-    // Acknowledge immediately.
     res.status(200).send("OK");
 
-    // Process asynchronously.
     (async () => {
       try {
         const eventType = payload.event_type || payload.eventType;
@@ -141,7 +138,7 @@ app.post(
             }
           }
         }
-        // Mark event processed so restart recovery skips it
+
         await WebhookEvent.updateOne(
           { eventId },
           { $set: { processed: true, processedAt: new Date() } },
@@ -153,7 +150,6 @@ app.post(
   },
 );
 
-// JSON parser for normal API routes
 app.use(express.json({ limit: "256kb" }));
 
 app.post("/rules", async (req, res) => {
@@ -196,7 +192,6 @@ app.get("/stats", async (_req, res) => {
       status: { $in: ["queued", "processing", "accepted"] },
     });
 
-    // Read the honest duplicate counter (incremented in processor.js)
     const db = mongoose.connection.db;
     const statsDoc = db
       ? await db.collection("stats").findOne({ _id: "global" })
@@ -210,7 +205,6 @@ app.get("/stats", async (_req, res) => {
   }
 });
 
-// Diagnostic endpoint — do not expose message contents or secrets
 app.get("/debug/jobs", async (_req, res) => {
   try {
     const queued = await DMJob.countDocuments({ status: "queued" });

@@ -1,17 +1,14 @@
 const path = require("path");
-// load dotenv from backend/.env without overwriting existing env vars
 const fs = require("fs");
 const dotenv = require("dotenv");
 const envPath = path.resolve(__dirname, "..", ".env");
 try {
   const exists = fs.existsSync(envPath);
   if (exists) {
-    // try standard dotenv first
     try {
       dotenv.config({ path: envPath });
     } catch (e) {}
 
-    // If still not populated (some environments), do a conservative manual parse
     if (typeof process.env.MONGODB_URI === "undefined") {
       try {
         const content = fs.readFileSync(envPath, "utf8");
@@ -27,12 +24,10 @@ try {
           if (typeof process.env[key] === "undefined") process.env[key] = val;
         }
       } catch (e) {
-        // ignore
       }
     }
   }
 } catch (e) {
-  // ignore parse errors here; we'll fail later if required vars missing
 }
 const express = require("express");
 const mongoose = require("mongoose");
@@ -53,7 +48,6 @@ const PORT = process.env.PORT || 3000;
 function sanitizeError(err) {
   if (!err) return "";
   const msg = err && err.message ? err.message : String(err);
-  // redact basic mongodb credentials if accidentally included
   return msg.replace(
     /(mongodb(?:\+srv)?:\/\/)([^:@\s]+):([^@\s]+)@/g,
     "$1<user>:<redacted>@",
@@ -61,7 +55,6 @@ function sanitizeError(err) {
 }
 
 async function start() {
-  // prefer explicit env var names; fail fast if not provided
   const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
   if (!mongoUri) {
     console.error(
@@ -73,14 +66,12 @@ async function start() {
   await mongoose.connect(mongoUri);
   console.log("MongoDB connected");
 
-  // recover only stale processing jobs (use processingStartedAt lease)
   try {
     await recoverStaleProcessing();
   } catch (e) {
     console.error("startup recovery error", sanitizeError(e));
   }
 
-  // process any persisted WebhookEvent that hasn't been processed yet
   const { processPendingWebhookEvents } = require("./services/processor");
   await processPendingWebhookEvents();
 
@@ -109,7 +100,6 @@ async function start() {
           }
           await sleep(pollMs);
         } else {
-          // work done, continue immediately
           workerIdleLogged = false;
         }
       } catch (err) {
@@ -120,7 +110,6 @@ async function start() {
     console.log(`WORKER_LOOP[${id}] stopped`);
   }
 
-  // start exactly one worker loop (self-scheduling)
   const workerTask = workerLoop(0).catch((err) =>
     console.error("workerLoop fatal", sanitizeError(err)),
   );
@@ -133,7 +122,6 @@ async function start() {
     }
   }, reconciliationMs);
 
-  // periodic recovery of stale 'processing' leases
   const recoverInterval = setInterval(async () => {
     try {
       await recoverStaleProcessing();
@@ -150,21 +138,17 @@ async function start() {
     try {
       console.log("Shutting down");
       workerRunning = false;
-      // allow reconciliation to stop
       clearInterval(reconInterval);
       clearInterval(recoverInterval);
-      // close HTTP server gracefully
       server.close(() => {
         console.log("HTTP server closed");
       });
-      // wait for worker loops to finish their current iteration
       try {
         await Promise.race([
           workerTask,
           new Promise((res) => setTimeout(res, Math.max(pollMs * 2, 1000))),
         ]);
       } catch (e) {
-        // ignore
       }
       await mongoose.disconnect();
       console.log("MongoDB disconnected");

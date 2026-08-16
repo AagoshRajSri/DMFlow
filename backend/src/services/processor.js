@@ -14,7 +14,6 @@ async function incrementDuplicatesBlocked() {
       { upsert: true },
     );
   } catch (e) {
-    // non-critical — don't let this break the main flow
     console.error("incrementDuplicatesBlocked error", e && e.message ? e.message : e);
   }
 }
@@ -29,13 +28,8 @@ async function createDeliveryAndJobAtomic({
   const idempotencyKey = `${ruleId.toString()}:${recipientUserId}`;
   const session = await mongoose.startSession();
   try {
-    let useTransaction = true;
-    // Some environments (standalone mongod) may not support transactions.
-    // Try a transaction and fallback to safe upsert behavior.
     await session.withTransaction(async () => {
-      // create Delivery (enforces uniqueness)
       await Delivery.create([{ ruleId, recipientUserId }], { session });
-      // create DMJob (persist idempotencyKey)
       await DMJob.create(
         [
           {
@@ -57,7 +51,6 @@ async function createDeliveryAndJobAtomic({
     return { created: true };
   } catch (err) {
     session.endSession();
-    // If transaction not supported or duplicate key, fall back to safer approach
     const txNotSupported =
       (err &&
         err.message &&
@@ -68,21 +61,17 @@ async function createDeliveryAndJobAtomic({
           err.code === 20 ||
           err.codeName === "IllegalOperation"));
     if (txNotSupported) {
-      // fallback: create Delivery first to rely on Delivery's unique index,
-      // then create the DMJob only when Delivery creation succeeds.
       try {
         try {
           await Delivery.create({ ruleId, recipientUserId });
         } catch (de) {
           if (de && de.code === 11000) {
-            // Delivery already exists -> duplicate, never send a second DM
             await incrementDuplicatesBlocked();
             return { created: false, duplicate: true };
           }
           throw de;
         }
 
-        // Delivery created successfully, now create the DMJob (include idempotencyKey)
         try {
           await DMJob.create({
             ruleId,
@@ -96,7 +85,6 @@ async function createDeliveryAndJobAtomic({
             nextAttemptAt: new Date(),
           });
         } catch (eCreate) {
-          // if DMJob create races due to unique index, treat as duplicate
           if (eCreate && eCreate.code === 11000) {
             return { created: false, duplicate: true };
           }
@@ -111,7 +99,6 @@ async function createDeliveryAndJobAtomic({
       }
     }
 
-    // duplicate Delivery (someone else created it)
     if (err.code === 11000) {
       await incrementDuplicatesBlocked();
       return { created: false, duplicate: true };
@@ -189,10 +176,6 @@ async function processWebhookEventById(eventId) {
       });
 
       console.log("JOB RESULT:", res);
-
-      if (res.created) {
-        // enqueue is done, mark event processed
-      }
     }
   }
 
@@ -210,7 +193,6 @@ async function processPendingWebhookEvents() {
     try {
       await processWebhookEventById(ev.eventId);
     } catch (err) {
-      // log and continue
       console.error(
         "processPendingWebhookEvents error",
         err && err.message ? err.message : err,

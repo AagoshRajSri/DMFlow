@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
 export default function WebhookTest({ rules = [] }) {
   const [commentText, setCommentText] = useState("");
@@ -19,7 +19,6 @@ export default function WebhookTest({ rules = [] }) {
 
     setComments((prev) => [...prev, newComment]);
     
-    // Check if the comment matches any rule
     const matchedRule = rules.find((r) => 
       commentText.toLowerCase().includes(r.keyword.toLowerCase())
     );
@@ -28,7 +27,7 @@ export default function WebhookTest({ rules = [] }) {
       setTimeout(() => {
         setDmNotification(`DMFlow: ${matchedRule.dm_message}`);
         setTimeout(() => setDmNotification(null), 5000);
-      }, 800); // simulate a slight delay for realism
+      }, 800);
     }
 
     setCommentText("");
@@ -37,7 +36,6 @@ export default function WebhookTest({ rules = [] }) {
   return (
     <div className="relative h-[450px] w-full max-w-sm mx-auto bg-[#000] border-4 border-[#262626] rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col font-sans">
       
-      {/* Top Header - Mock Instagram Post Header */}
       <div className="flex items-center px-4 py-3 border-b border-[#262626] bg-[#121212]">
         <div className="w-8 h-8 rounded-full ig-gradient p-[2px]">
           <div className="bg-black w-full h-full rounded-full flex items-center justify-center">
@@ -54,13 +52,11 @@ export default function WebhookTest({ rules = [] }) {
         </div>
       </div>
 
-      {/* Post Image Area (Mock) */}
       <div className="h-40 w-full bg-[#121212] flex items-center justify-center border-b border-[#262626] relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-orange-500/10" />
         <span className="text-gray-500 text-sm font-bold tracking-wide uppercase z-10">Comment your keyword below 👇</span>
       </div>
 
-      {/* DM Notification Popup */}
       {dmNotification && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[90%] bg-[#262626]/95 border border-[#404040] rounded-2xl p-3 shadow-2xl z-20 animate-slide-down backdrop-blur-md">
           <div className="flex items-start gap-3">
@@ -77,7 +73,6 @@ export default function WebhookTest({ rules = [] }) {
         </div>
       )}
 
-      {/* Comments Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black scrollbar-hide">
         {comments.map((c) => (
           <div key={c.id} className="flex gap-3 text-sm">
@@ -92,7 +87,6 @@ export default function WebhookTest({ rules = [] }) {
         ))}
       </div>
 
-      {/* Comment Input */}
       <div className="p-3 border-t border-[#262626] bg-[#121212]">
         <form onSubmit={handleSend} className="flex items-center gap-2 relative">
           <input

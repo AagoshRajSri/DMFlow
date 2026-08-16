@@ -25,11 +25,8 @@ const DMJobSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// index to support job lookup by status/nextAttempt
 DMJobSchema.index({ status: 1, nextAttemptAt: 1 });
 
-// enforce one active job per idempotencyKey (queued/processing/accepted)
-// this is a partial unique index so historical/failed/delivered rows are allowed
 DMJobSchema.index(
   { idempotencyKey: 1 },
   {
